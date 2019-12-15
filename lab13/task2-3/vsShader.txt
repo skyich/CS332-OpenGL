@@ -1,0 +1,16 @@
+#version 330 core
+attribute vec3 coord;
+attribute vec3 norm;
+attribute vec2 texCoord;
+uniform mat3 affine;
+uniform vec3 lightPoint;
+out vec3 Norm;
+out vec2 TexCoord;
+out vec3 LightVec;
+void main() {
+vec3 tmp = affine * coord;
+gl_Position = vec4(tmp, (0.1 * tmp.z + 1.0) * 1.0);
+TexCoord = -texCoord;
+Norm = norm;
+LightVec = tmp - lightPoint;
+}

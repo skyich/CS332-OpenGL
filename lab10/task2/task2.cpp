@@ -20,7 +20,7 @@ int projection = 0;
 //первое место
 float x = 4.5, y = 1, z = 0;
 //третье место
-float x1 = 6.5, y11 = 0, z1 = 0;
+float x1 = 6.9, y11 = 0.4, z1 = 0;
 //второе место
 float x2 = 2, y2 = 0.5, z2 = 0;
 
@@ -103,7 +103,7 @@ void drawWireCube() {
 	}
 
 	glColor3f(184 / 255.0, 134 / 255.0, 11 / 255.0);
-	glutSolidCube(1);
+	glutSolidCube(1.8);
 
 	glPopMatrix();
 

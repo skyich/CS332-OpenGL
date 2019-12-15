@@ -1,0 +1,13 @@
+#version 330 core
+attribute vec3 coord;
+attribute vec4 clr;
+attribute vec2 texCoord;
+uniform mat3 affine;
+out vec2 TexCoord;
+out vec4 Clr;
+void main() {
+vec3 tmp = affine * coord;
+gl_Position = vec4(tmp, (0.1 * tmp.z + 1.0) * 1.0);
+TexCoord = -texCoord;
+Clr = clr;
+}

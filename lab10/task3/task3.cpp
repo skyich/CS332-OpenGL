@@ -12,6 +12,9 @@ static int w = 800, h = 600;
 
 vector<double> rs;
 int projection = 0;
+double rotate_x = 0;
+double rotate_y = 0;
+double rotate_z = 0;
 
 double fRand(double fMin, double fMax)
 {
@@ -51,7 +54,6 @@ void Reshape(int width, int height) {
 
 void modelTree(int x, int y, int z, double cf = 1) {
 	glTranslated(x, y, z);
-	glRotated(65, -1.0, 0.0, 0.0);
 	glColor3ub(89, 60, 31);
 	glutSolidCylinder(0.2 * cf, 1 * cf, 50, 50);
 	glTranslated(0, 0, 1 * cf);
@@ -68,24 +70,28 @@ void drawTree() {
 	if (!projection) {
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		glOrtho(-10, 10, -10, 10, -10, 10);
+		glOrtho(-15, 15, -15, 15, -15, 15);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
 	}
 	else {
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
-		gluPerspective(65.0f, w / h, 0.1f, 1000.0f);
+		gluPerspective(50.0f, w / h, 0.1f, 1000.0f);
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
-		gluLookAt(0.0f, 0.0f, 15.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+		gluLookAt(16.0f, 16.0f, 10, 0.0, 0.0, 0.0, -15.0, -15.0, 0.0);
 	}
+
+	glRotatef(rotate_x, 1.0, 0.0, 0.0);
+	glRotatef(rotate_y, 0.0, 1.0, 0.0);
+	glRotatef(rotate_z, 0.0, 0.0, 1.0);
 
 	glPushMatrix();
 	
 	int i = 0;
-	for (int x = -8; x < 15; x += randDist())
-		for (int y = -10; y < 15; y += randDist()) {
+	for (int x = -8; x < 15; x += 3)
+		for (int y = -10; y < 15; y += 3) {
 			modelTree(x, y, 0, rs[i++]);
 			glPopMatrix();
 			glPushMatrix();
@@ -99,6 +105,12 @@ void specialKeys(int key, int x, int y) {
 	switch ((int)key) {
 	case GLUT_KEY_SHIFT_L: projection = 0; break;
 	case GLUT_KEY_CTRL_L: projection = 1; break;
+	case GLUT_KEY_UP: rotate_x += 5; break;
+	case GLUT_KEY_DOWN: rotate_x -= 5; break;
+	case GLUT_KEY_RIGHT: rotate_y += 5; break;
+	case GLUT_KEY_LEFT: rotate_y -= 5; break;
+	case GLUT_KEY_PAGE_UP: rotate_z += 5; break;
+	case GLUT_KEY_PAGE_DOWN: rotate_z -= 5; break;
 	}
 	glutPostRedisplay();
 }
