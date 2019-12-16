@@ -18,7 +18,7 @@ using namespace std;
 GLuint m_VAO;
 GLuint m_Buffers[4];
 
-objl::Loader ldr;
+objl::Loader loader;
 
 GLuint Program;
 
@@ -35,39 +35,21 @@ GLuint texture;
 float light[3] = { 0.0f, 3.0f, -10.0f };
 float affineMatr[9] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
 
-struct vertex
-{
-	GLfloat x;
-	GLfloat y;
-	GLfloat z;
-	GLfloat tx;
-	GLfloat ty;
-};
-
 void shaderLog(unsigned int shader)
 {
-	int infologLen = 0;
-	int charsWritten = 0;
-	char* infoLog;
-	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infologLen);
-	if (infologLen > 1)
-	{
-		infoLog = new char[infologLen];
-		if (infoLog == NULL)
-		{
-			std::cout << "ERROR: Could not allocate InfoLog buffer\n";
-			exit(1);
-		}
-		glGetShaderInfoLog(shader, infologLen, &charsWritten, infoLog);
-		std::cout << "InfoLog: " << infoLog << "\n\n\n";
-		delete[] infoLog;
+	GLint success;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		GLchar InfoLog[1024];
+		glGetShaderInfoLog(shader, sizeof(InfoLog), NULL, InfoLog);
+		fprintf(stderr, "Error compiling shader type %d: '%s'\n", shader, InfoLog);
 	}
 }
 
 void initGL()
 {
 	glEnable(GL_DEPTH_TEST);
-	glClearColor(0.5, 0.3, 0.2, 0);
+	glClearColor(1, 1, 1, 1);
 }
 
 void checkOpenGLerror()
@@ -90,64 +72,35 @@ std::string readShader(std::string filename)
 
 void initShader()
 {
-
-	//const char* vsSource =
-	//	"#version 330 core\n"
-	//	"attribute vec3 coord;\n"
-	//	"attribute vec3 norm;\n"
-	//	"attribute vec2 texCoord;\n"
-	//	"uniform mat3 affine;\n"
-	//	"uniform vec3 lightPoint;\n"
-	//	"out vec3 Norm;\n"
-	//	"out vec2 TexCoord;\n"
-	//	"out vec3 LightVec;\n"
-	//	"void main() {\n"
-	//	"vec3 tmp = affine * coord;\n"
-	//	"gl_Position = vec4(tmp, (0.1 * tmp.z + 1.0) * 1.0);\n"
-	//	"TexCoord = -texCoord;\n"
-	//	"Norm = norm;\n"
-	//	"LightVec = tmp - lightPoint;\n"
-	//	"}\n";
-	//const char* fsSource =
-	//	"#version 330 core\n"
-	//	"in vec3 Norm;\n"
-	//	"in vec2 TexCoord;\n"
-	//	"in vec3 LightVec;\n"
-	//	"uniform sampler2D ourTexture;\n"
-	//	"out vec4 color;\n"
-	//	"void main() {\n"
-	//	"float cosTheta = clamp( -dot( Norm, LightVec ), 0, 1);\n"
-	//	"color = texture(ourTexture, TexCoord) * (cosTheta + 0.2);\n"
-	//	"}\n";
-
 	std::string vs = readShader("vsShader.txt");
 	std::string fs = readShader("fsShader.txt");
 	const char* vsSource = vs.data();
 	const char* fsSource = fs.data();
 
+	Program = glCreateProgram();
+
 	GLuint vShader, fShader;
 	vShader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vShader, 1, &vsSource, NULL);
 	glCompileShader(vShader);
-	std::cout << "vertex shader \n";
 	shaderLog(vShader);
 	fShader = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fShader, 1, &fsSource, NULL);
 	glCompileShader(fShader);
-	std::cout << "fragment shader \n";
 	shaderLog(fShader);
-	Program = glCreateProgram();
+
 	glAttachShader(Program, vShader);
 	glAttachShader(Program, fShader);
 	glLinkProgram(Program);
 
-	int link_ok;
-	glGetProgramiv(Program, GL_LINK_STATUS, &link_ok);
-	if (!link_ok)
-	{
-		std::cout << "error attach shaders \n";
-		return;
+	GLint success;
+	glGetProgramiv(Program, GL_LINK_STATUS, &success);
+	if (success == 0) {
+		GLchar ErrorLog[1024];
+		glGetProgramInfoLog(Program, sizeof(ErrorLog), NULL, ErrorLog);
+		fprintf(stderr, "Error linking shader program: '%s'\n", ErrorLog);
 	}
+
 
 	const char* attr_name0 = "coord";
 	Attrib_vertex = glGetAttribLocation(Program, attr_name0);
@@ -193,7 +146,7 @@ void initShader()
 
 void initVAO()
 {
-	ldr.LoadFile("african_head.obj");
+	loader.LoadFile("african_head.obj");
 	glGenVertexArrays(1, &m_VAO);
 	glBindVertexArray(m_VAO);
 	glGenBuffers(4, m_Buffers);
@@ -203,8 +156,8 @@ void initVAO()
 	std::vector<objl::Vector2> TexCoords;
 	std::vector<unsigned int> Indices;
 
-	unsigned int NumVertices = ldr.LoadedMeshes[0].Vertices.size();
-	unsigned int NumIndices = ldr.LoadedMeshes[0].Indices.size();
+	unsigned int NumVertices = loader.LoadedMeshes[0].Vertices.size();
+	unsigned int NumIndices = loader.LoadedMeshes[0].Indices.size();
 
 	Positions.reserve(NumVertices);
 	Normals.reserve(NumVertices);
@@ -212,13 +165,13 @@ void initVAO()
 	Indices.reserve(NumIndices);
 
 	for (unsigned int i = 0; i < NumVertices; i++) {
-		Positions.push_back(ldr.LoadedMeshes[0].Vertices[i].Position);
-		Normals.push_back(ldr.LoadedMeshes[0].Vertices[i].Normal);
-		TexCoords.push_back(ldr.LoadedMeshes[0].Vertices[i].TextureCoordinate);
+		Positions.push_back(loader.LoadedMeshes[0].Vertices[i].Position);
+		Normals.push_back(loader.LoadedMeshes[0].Vertices[i].Normal);
+		TexCoords.push_back(loader.LoadedMeshes[0].Vertices[i].TextureCoordinate);
 	}
 
 	for (unsigned int i = 0; i < NumIndices; i++) {
-		Indices.push_back(ldr.LoadedMeshes[0].Indices[i]);
+		Indices.push_back(loader.LoadedMeshes[0].Indices[i]);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
@@ -261,14 +214,17 @@ void freeVAO()
 
 void initTexture()
 {
+
 	int width, height;
-	unsigned char* image = SOIL_load_image("african_head_SSS.jpg", &width, &height, 0, SOIL_LOAD_RGB);
+	unsigned char* image = SOIL_load_image("african_head_diffuse.jpg", &width, &height, 0, SOIL_LOAD_RGB);
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	SOIL_free_image_data(image);
 	glBindTexture(GL_TEXTURE_2D, 0);
+
+
 }
 
 void resizeWindow(int width, int height)
@@ -278,29 +234,7 @@ void resizeWindow(int width, int height)
 
 void render()
 {
-	//glClear(GL_COLOR_BUFFER_BIT);
-
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//glUseProgram(Program);
-	//static float red[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-	//static float green[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
-	//static float blue[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-	//glUniform4fv(Unif_color, 1, red);
-	//glUniformMatrix3fv(Unif_affine, 1, GL_FALSE, affineMatr);
-	//glEnableVertexAttribArray(Attrib_vertex);
-	//glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	//glVertexAttribPointer(Attrib_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	//glBindBuffer(GL_ARRAY_BUFFER, 0);
-	//glDrawArrays(GL_TRIANGLES, 0, 12);
-	//glUniform4fv(Unif_color, 1, green);
-	//glDrawArrays(GL_TRIANGLES, 12, 12);
-	//glUniform4fv(Unif_color, 1, blue);
-	//glDrawArrays(GL_TRIANGLES, 24, 12);
-	//glDisableVertexAttribArray(Attrib_vertex);
-	//glUseProgram(0);
-	//checkOpenGLerror();
-	//glutSwapBuffers();
 
 	glUseProgram(Program);
 	glUniform3fv(Unif_light, 1, light);
@@ -310,7 +244,7 @@ void render()
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glEnable(GL_TEXTURE_2D);
 	glDrawElements(GL_TRIANGLES,
-		ldr.LoadedMeshes[0].Indices.size(),
+		loader.LoadedMeshes[0].Indices.size(),
 		GL_UNSIGNED_INT,
 		NULL);
 	glDisable(GL_TEXTURE_2D);
