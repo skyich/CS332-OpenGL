@@ -1,10 +1,12 @@
 #version 330 core
-in vec3 Norm;
-in vec2 TexCoord;
-in vec3 LightVec;
-uniform sampler2D ourTexture;
+in vec2 vert_texcoord;
+in vec4 vert_color;
+uniform bool use_texture;
+uniform sampler2D texture;
 out vec4 color;
 void main() {
-float cosTheta = clamp( -dot( Norm, LightVec ), 0, 1);
-color = texture(ourTexture, TexCoord) * (cosTheta + 0.2);
+if(use_texture)
+	color = vert_color * texture(texture, vert_texcoord);
+else
+	color = vert_color;
 }

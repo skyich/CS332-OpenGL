@@ -5,8 +5,10 @@
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+#include "glm/glm.hpp"
 #include "SOIL.h"
 #include "OBJ_Loader.h"
+#include "objloader.h"
 
 using namespace std;
 
@@ -31,6 +33,7 @@ GLint Unif_light;
 GLint Unif_affine;
 
 GLuint texture;
+size_t indices_size;
 
 float light[3] = { 0.0f, 3.0f, -10.0f };
 float affineMatr[9] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
@@ -144,12 +147,10 @@ void initShader()
 	checkOpenGLerror();
 }
 
+/*
 void initVAO()
 {
 	loader.LoadFile("african_head.obj");
-	glGenVertexArrays(1, &m_VAO);
-	glBindVertexArray(m_VAO);
-	glGenBuffers(4, m_Buffers);
 
 	std::vector<objl::Vector3> Positions;
 	std::vector<objl::Vector3> Normals;
@@ -174,6 +175,12 @@ void initVAO()
 		Indices.push_back(loader.LoadedMeshes[0].Indices[i]);
 	}
 
+
+
+	glGenVertexArrays(1, &m_VAO);
+	glBindVertexArray(m_VAO);
+	glGenBuffers(4, m_Buffers);
+
 	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(Positions[0]) * Positions.size(), &Positions[0], GL_STATIC_DRAW);
 
@@ -192,6 +199,52 @@ void initVAO()
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
+
+	glBindVertexArray(0);
+
+
+	checkOpenGLerror();
+}*/
+
+void initVAO()
+{
+	// Read our .obj file
+	std::vector<glm::vec3> vertices;
+	std::vector<glm::vec2> texcoords;
+	std::vector<glm::vec3> normals;
+	bool res = loadOBJ("african_head.obj", vertices, texcoords, normals);
+	printf("vertices: %d\ntexcoords: %d\nnormals: %d\n", vertices.size(), texcoords.size(), normals.size());
+
+	std::vector<unsigned short> indices;
+	std::vector<glm::vec3> indexed_vertices;
+	std::vector<glm::vec2> indexed_texcoords;
+	std::vector<glm::vec3> indexed_normals;
+	indexVBO(vertices, texcoords, normals, indices, indexed_vertices, indexed_texcoords, indexed_normals);
+	printf("indexed_vertices: %d\nindexed_texcoords: %d\nindexed_normals: %d\nindices: %d\n", indexed_vertices.size(), indexed_texcoords.size(), indexed_normals.size(), indices.size());
+	
+	glGenVertexArrays(1, &m_VAO);
+	glBindVertexArray(m_VAO);
+	glGenBuffers(4, m_Buffers);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_vertices.size(), &indexed_vertices[0], GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(Attrib_vertex);
+	glVertexAttribPointer(Attrib_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[TEXCOORD_VB]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * indexed_texcoords.size(), &indexed_texcoords[0], GL_STATIC_DRAW);
+	glEnableVertexAttribArray(Attrib_vertex1);
+	glVertexAttribPointer(Attrib_vertex1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_normals.size(), &indexed_normals[0], GL_STATIC_DRAW);
+	glEnableVertexAttribArray(Attrib_vertex2);
+	glVertexAttribPointer(Attrib_vertex2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
+	indices_size = indices.size();
 
 	glBindVertexArray(0);
 
@@ -241,13 +294,14 @@ void render()
 	glUniformMatrix3fv(Unif_affine, 1, GL_FALSE, affineMatr);
 
 	glBindVertexArray(m_VAO);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glEnable(GL_TEXTURE_2D);
+	//glEnable(GL_TEXTURE_2D);
 	glDrawElements(GL_TRIANGLES,
-		loader.LoadedMeshes[0].Indices.size(),
-		GL_UNSIGNED_INT,
-		NULL);
-	glDisable(GL_TEXTURE_2D);
+		indices_size,
+		GL_UNSIGNED_SHORT,
+		(void*)0);
+	//glDisable(GL_TEXTURE_2D);
 	glBindVertexArray(0);
 
 	glUseProgram(0);
