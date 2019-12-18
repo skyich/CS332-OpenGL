@@ -1,12 +1,15 @@
-#version 330 core
-in vec2 vert_texcoord;
-in vec4 vert_color;
+#version 330
+out vec4 fcolor;
 uniform bool use_texture;
-uniform sampler2D texture;
-out vec4 color;
-void main() {
-if(use_texture)
-	color = vert_color * texture(texture, vert_texcoord);
-else
-	color = vert_color;
+uniform sampler2D material_texture;
+
+// параметры, полученные из вершинного шейдера
+in vec2 vert_texcoord;       
+in vec4 vert_color;
+
+void main(){
+	if(use_texture)
+		fcolor = vert_color * texture(material_texture, vert_texcoord);
+	else
+		fcolor = vert_color;
 }

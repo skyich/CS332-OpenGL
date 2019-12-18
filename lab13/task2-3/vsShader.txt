@@ -1,4 +1,4 @@
-#version 330 core
+#version 330
 attribute vec4 coord;
 attribute vec3 norm;
 attribute vec2 texcoord;
@@ -51,6 +51,5 @@ void main(){
 	colorW += material_specular * light_specular * RdotVpow * attenuation;
 	
 	vert_texcoord = texcoord;
-	//vert_color = vec4(1,0,0,1);
 	vert_color = colorW;
 }
