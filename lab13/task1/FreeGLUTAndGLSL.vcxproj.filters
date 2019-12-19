@@ -15,15 +15,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="OBJ_Loader.h">
+    <ClInclude Include="SOIL.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SOIL.h">
+    <ClInclude Include="objloader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="task1.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="objloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

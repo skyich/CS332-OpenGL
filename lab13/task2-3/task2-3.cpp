@@ -367,103 +367,6 @@ void render()
 }
 
 
-/*
-void render()
-{
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glUseProgram(Program);
-	glUniform3fv(Unif_light, 1, light);
-	glUniformMatrix3fv(Unif_affine, 1, GL_FALSE, affineMatr);
-
-	glBindVertexArray(m_VAO);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	//glEnable(GL_TEXTURE_2D);
-	glDrawElements(GL_TRIANGLES,
-		indices_size,
-		GL_UNSIGNED_SHORT,
-		(void*)0);
-	//glDisable(GL_TEXTURE_2D);
-	glBindVertexArray(0);
-
-	glUseProgram(0);
-	checkOpenGLerror();
-	glutSwapBuffers();
-}
-*/
-
-/*
-void MatrProduct(float a[])
-{
-	float tmp[9];
-	for (int i = 0; i < 9; ++i) tmp[i] = 0;
-
-	for (int i = 0; i < 9; i += 3)
-		for (int j = 0; j < 3; ++j)
-			for (int k = 0; k < 3; ++k)
-				tmp[i + j] += a[i + k] * affineMatr[3 * k + j];
-
-	for (int i = 0; i < 9; ++i) affineMatr[i] = tmp[i];
-}*/
-
-/*
-void Keyboard(unsigned char key, int x, int y)
-{
-	float a[9] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
-	switch (key)
-	{
-	case 'w':
-		a[4] = std::cos(0.08727);
-		a[5] = std::sin(0.08727);
-		a[7] = -a[5];
-		a[8] = a[4];
-		break;
-	case 's':
-		a[4] = std::cos(0.08727);
-		a[5] = -std::sin(0.08727);
-		a[7] = -a[5];
-		a[8] = a[4];
-		break;
-	case 'a':
-		a[0] = std::cos(0.08727);
-		a[2] = -std::sin(0.08727);
-		a[6] = -a[2];
-		a[8] = a[0];
-		break;
-	case 'd':
-		a[0] = std::cos(0.08727);
-		a[2] = std::sin(0.08727);
-		a[6] = -a[2];
-		a[8] = a[0];
-		break;
-	case 'q':
-		a[0] = std::cos(0.08727);
-		a[1] = std::sin(0.08727);
-		a[3] = -a[1];
-		a[4] = a[0];
-		break;
-	case 'e':
-		a[0] = std::cos(0.08727);
-		a[1] = -std::sin(0.08727);
-		a[3] = -a[1];
-		a[4] = a[0];
-		break;
-	case '+':
-		a[0] = 1.1;
-		a[4] = 1.1;
-		a[8] = 1.1;
-		break;
-	case '-':
-		a[0] = 1.0 / 1.1;
-		a[4] = 1.0 / 1.1;
-		a[8] = 1.0 / 1.1;
-		break;
-	}
-	MatrProduct(a);
-	glutPostRedisplay();
-}*/
-
 void keyboard(unsigned char key, int x, int y)
 {
 	switch (key)
@@ -487,34 +390,6 @@ void keyboard(unsigned char key, int x, int y)
 	glutPostRedisplay();
 }
 
-/*
-void SpecialKeys(int key, int x, int y)
-{
-	static float step = 0.1;
-	float X, Z;
-	switch (key)
-	{
-	case GLUT_KEY_UP:
-		light[1] += step;
-		break;
-	case GLUT_KEY_DOWN:
-		light[1] -= step;
-		break;
-	case GLUT_KEY_LEFT:
-		X = std::cos(0.08727) * light[0] + std::sin(0.08727) * light[2];
-		Z = std::cos(0.08727) * light[2] - std::sin(0.08727) * light[0];
-		light[0] = X;
-		light[2] = Z;
-		break;
-	case GLUT_KEY_RIGHT:
-		X = std::cos(0.08727) * light[0] - std::sin(0.08727) * light[2];
-		Z = std::cos(0.08727) * light[2] + std::sin(0.08727) * light[0];
-		light[0] = X;
-		light[2] = Z;
-		break;
-	}
-	glutPostRedisplay();
-}*/
 
 void specialKeys(int key, int x, int y) {
 	switch (key)

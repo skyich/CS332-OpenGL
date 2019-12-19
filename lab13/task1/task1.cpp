@@ -2,31 +2,52 @@
 #include <vector>
 #include <iostream>
 #include <random>
+#include <fstream>
+#include <string>
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+#include "glm/glm.hpp"
 #include "SOIL.h"
-#include "OBJ_Loader.h"
+#include "objloader.h"
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtx/transform.hpp> 
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/mat4x4.hpp>
 
 using namespace std;
 
-static int w = 800, h = 600;
+int w = 0, h = 0;
 
 #define INDEX_BUFFER	0
 #define POS_VB			1
 #define NORMAL_VB		2
 
 GLuint m_VAO;
-GLuint m_Buffers[3];
-
-objl::Loader loader;
+GLuint m_Buffers[4];
 
 GLuint Program;
 
-GLint Attrib_vertex;
-GLint Attrib_vertex2;
-GLint Unif_affine;
+GLint a_coord;
+GLint a_clr;
+GLint a_transform_model;
+GLint a_transform_viewProjection;
+GLint a_transform_normal;
+GLint a_transform_viewPosition;
 
+size_t indices_size;
+
+glm::vec3 eye;
+
+float rotateX = 0;
+float rotateY = 0;
+float scaleX = 1;
+float scaleY = 1;
+glm::mat4 Matrix_projection;
 
 float colors[8][4] = {
 	{ 1.0, 1.0, 1.0, 1.0 },
@@ -39,11 +60,21 @@ float colors[8][4] = {
 	{ 0.0, 0.0, 0.0, 1.0 }
 };
 
-float affineMatr[9] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
+void shaderLog(unsigned int shader)
+{
+	GLint success;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		GLchar InfoLog[1024];
+		glGetShaderInfoLog(shader, sizeof(InfoLog), NULL, InfoLog);
+		fprintf(stderr, "Error compiling shader type %d: '%s'\n", shader, InfoLog);
+	}
+}
 
-void Init(void) {
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+void initGL()
+{
 	glEnable(GL_DEPTH_TEST);
+	glClearColor(1, 1, 1, 1);
 }
 
 void checkOpenGLerror()
@@ -64,21 +95,10 @@ std::string readShader(std::string filename)
 	return res;
 }
 
-
-void shaderLog(unsigned int shader)
+void initShader()
 {
-	GLint success;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		GLchar InfoLog[1024];
-		glGetShaderInfoLog(shader, sizeof(InfoLog), NULL, InfoLog);
-		fprintf(stderr, "Error compiling shader type %d: '%s'\n", shader, InfoLog);
-	}
-}
-
-void InitShader(void) {
-	std::string vs = readShader("vsShaderP.txt");
-	std::string fs = readShader("fsShaderP.txt");
+	std::string vs = readShader("vsShader.txt");
+	std::string fs = readShader("fsShader.txt");
 	const char* vsSource = vs.data();
 	const char* fsSource = fs.data();
 
@@ -106,179 +126,172 @@ void InitShader(void) {
 		fprintf(stderr, "Error linking shader program: '%s'\n", ErrorLog);
 	}
 
-	glUseProgram(Program);
+	const char* attr_name = "coord";
+	a_coord = glGetAttribLocation(Program, attr_name);
 
-	const char* attr_name0 = "coord";
-	Attrib_vertex = glGetAttribLocation(Program, attr_name0);
-	if (Attrib_vertex == -1)
-	{
-		std::cout << "could not bind attrib " << attr_name0 << std::endl;
-		return;
-	}
+	attr_name = "clr";
+	a_clr = glGetAttribLocation(Program, attr_name);
 
-	const char* attr_name1 = "clr";
-	Attrib_vertex2 = glGetAttribLocation(Program, attr_name1);
-	if (Attrib_vertex2 == -1)
-	{
-		std::cout << "could not bind uniform " << attr_name1 << std::endl;
-		return;
-	}
 
-	const char* unif_name1 = "affine";
-	Unif_affine = glGetUniformLocation(Program, unif_name1);
-	if (Unif_affine == -1)
-	{
-		std::cout << "could not bind uniform " << unif_name1 << std::endl;
-		return;
-	}
+
+	const char* unif_name = "transform_model";
+	a_transform_model = glGetUniformLocation(Program, unif_name);
+
+	unif_name = "transform_viewProjection";
+	a_transform_viewProjection = glGetUniformLocation(Program, unif_name);
+
+	unif_name = "transform_normal";
+	a_transform_normal = glGetUniformLocation(Program, unif_name);
+
+	unif_name = "transform_viewPosition";
+	a_transform_viewPosition = glGetUniformLocation(Program, unif_name);
+
 	checkOpenGLerror();
 }
 
-//https://triplepointfive.github.io/ogltutor/tutorials/tutorial32.html
+
+
 void initVAO()
 {
-	loader.LoadFile("Bowl.obj");
+	// Read our .obj file
+	std::vector<glm::vec3> vertices;
+	std::vector<glm::vec2> texcoords;
+	std::vector<glm::vec3> normals;
+	bool res = loadOBJ("african_head.obj", vertices, texcoords, normals);
+	printf("vertices: %d\ntexcoords: %d\nnormals: %d\n", vertices.size(), texcoords.size(), normals.size());
+
+	std::vector<unsigned short> indices;
+	std::vector<glm::vec3> indexed_vertices;
+	std::vector<glm::vec2> indexed_texcoords;
+	std::vector<glm::vec3> indexed_normals;
+	indexVBO(vertices, texcoords, normals, indices, indexed_vertices, indexed_texcoords, indexed_normals);
+	printf("indexed_vertices: %d\nindexed_texcoords: %d\nindexed_normals: %d\nindices: %d\n", indexed_vertices.size(), indexed_texcoords.size(), indexed_normals.size(), indices.size());
+
 	glGenVertexArrays(1, &m_VAO);
 	glBindVertexArray(m_VAO);
 	glGenBuffers(3, m_Buffers);
 
-	std::vector<objl::Vector3> Positions;
-	std::vector<objl::Vector3> Normals;
-	std::vector<unsigned int> Indices;
+	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_vertices.size(), &indexed_vertices[0], GL_STATIC_DRAW);
 
-	unsigned int NumVertices = loader.LoadedMeshes[0].Vertices.size();
-	unsigned int NumIndices = loader.LoadedMeshes[0].Indices.size();
+	glEnableVertexAttribArray(a_coord);
+	glVertexAttribPointer(a_coord, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-	Positions.reserve(NumVertices);
-	Normals.reserve(NumVertices);
-	Indices.reserve(NumIndices);
-
-	for (unsigned int i = 0; i < NumVertices; i++) {
-		Positions.push_back(loader.LoadedMeshes[0].Vertices[i].Position);
-		Normals.push_back(loader.LoadedMeshes[0].Vertices[i].Normal);
-	}
-
-	for (unsigned int i = 0; i < NumIndices; i++) {
-		Indices.push_back(loader.LoadedMeshes[0].Indices[i]);
-	}
-
-	float* COLORS = new float[4 * Positions.size()];
-	for (int i = 0; i < Positions.size(); ++i) {
+	float* COLORS = new float[4 * indexed_vertices.size()];
+	for (int i = 0; i < indexed_vertices.size(); ++i) {
 		int r = std::rand() % 8;
 		for (int j = 0; j < 4; ++j) {
 			COLORS[i * 4 + j] = colors[r][j];
 		}
 	}
 
-	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Positions[0]) * Positions.size(), &Positions[0], GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(Attrib_vertex);
-	glVertexAttribPointer(Attrib_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
 	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * Positions.size(), COLORS, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(Attrib_vertex2);
-	glVertexAttribPointer(Attrib_vertex2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * indexed_vertices.size(), COLORS, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(a_clr);
+	glVertexAttribPointer(a_clr, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices[0]) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
+	indices_size = indices.size();
 
-	//glBindVertexArray(0);
+	glBindVertexArray(0);
+
+
 	checkOpenGLerror();
 }
 
+void freeShader()
+{
+	glUseProgram(0);
+	glDeleteProgram(Program);
+}
 
-void Reshape(int width, int height) {
-	glViewport(0, 0, width, height);
+void freeVAO()
+{
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(4, m_Buffers);
+	glDeleteVertexArrays(1, &m_VAO);
 }
 
 
-void Render() {
+void resizeWindow(int x, int y)
+{
+	if (y == 0 || x == 0) return;
+
+	w = x;
+	h = y;
+	glViewport(0, 0, w, h);
+
+	Matrix_projection = glm::perspective(80.0f, (float)w / h, 0.01f, 200.0f);
+	eye = { 1.5,0,0 };
+	glm::vec3 center = { 0,0,0 };
+	glm::vec3 up = { 0,0,-1 };
+
+	Matrix_projection *= glm::lookAt(eye, center, up);
+}
+
+void render()
+{
+	glMatrixMode(GL_MODELVIEW);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUniformMatrix3fv(Unif_affine, 1, GL_FALSE, affineMatr);
+	glUseProgram(Program);
+	
+	// vert shader part, never changes
+	glm::mat4 transform_model = glm::rotate(rotateY, glm::vec3(0, 0, 1));
+	transform_model = glm::rotate(transform_model, rotateX, glm::vec3(1, 0, 0));
+
+	glUniformMatrix4fv(a_transform_model, 1, false, glm::value_ptr(transform_model));
+	glUniformMatrix4fv(a_transform_viewProjection, 1, false, glm::value_ptr(Matrix_projection));
+	glUniform3fv(a_transform_viewPosition, 1, glm::value_ptr(eye));
+
+	glm::mat3 transform_normal = glm::inverseTranspose(glm::mat3(transform_model));
+	glUniformMatrix3fv(a_transform_normal, 1, false, glm::value_ptr(transform_normal));
+
+	glBindVertexArray(m_VAO);
+
 	glDrawElements(GL_TRIANGLES,
-		loader.LoadedMeshes[0].Indices.size(),
-		GL_UNSIGNED_INT,
-		NULL);
+		indices_size,
+		GL_UNSIGNED_SHORT,
+		(void*)0);
+
+	glBindVertexArray(0);
+
+	glUseProgram(0);
+	checkOpenGLerror();
 	glutSwapBuffers();
 }
 
-void MatrProduct(float a[])
+
+void keyboard(unsigned char key, int x, int y)
 {
-	float tmp[9];
-	for (int i = 0; i < 9; ++i) tmp[i] = 0;
-
-	for (int i = 0; i < 9; i += 3)
-		for (int j = 0; j < 3; ++j)
-			for (int k = 0; k < 3; ++k)
-				tmp[i + j] += a[i + k] * affineMatr[3 * k + j];
-
-	for (int i = 0; i < 9; ++i) affineMatr[i] = tmp[i];
-}
-
-void Keyboard(unsigned char key, int x, int y){
-	float a[9] = { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 };
 	switch (key)
 	{
 	case 'w':
-		a[4] = std::cos(0.08727);
-		a[5] = std::sin(0.08727);
-		a[7] = -a[5];
-		a[8] = a[4];
+		rotateX += 0.1;
 		break;
 	case 's':
-		a[4] = std::cos(0.08727);
-		a[5] = -std::sin(0.08727);
-		a[7] = -a[5];
-		a[8] = a[4];
+		rotateX -= 0.1;
 		break;
 	case 'a':
-		a[0] = std::cos(0.08727);
-		a[2] = -std::sin(0.08727);
-		a[6] = -a[2];
-		a[8] = a[0];
+		rotateY -= 0.1;
 		break;
 	case 'd':
-		a[0] = std::cos(0.08727);
-		a[2] = std::sin(0.08727);
-		a[6] = -a[2];
-		a[8] = a[0];
+		rotateY += 0.1;
 		break;
-	case 'q':
-		a[0] = std::cos(0.08727);
-		a[1] = std::sin(0.08727);
-		a[3] = -a[1];
-		a[4] = a[0];
-		break;
-	case 'e':
-		a[0] = std::cos(0.08727);
-		a[1] = -std::sin(0.08727);
-		a[3] = -a[1];
-		a[4] = a[0];
-		break;
-	case '+':
-		a[0] = 1.1;
-		a[4] = 1.1;
-		a[8] = 1.1;
-		break;
-	case '-':
-		a[0] = 1.0 / 1.1;
-		a[4] = 1.0 / 1.1;
-		a[8] = 1.0 / 1.1;
+	default:
 		break;
 	}
-	MatrProduct(a);
+
 	glutPostRedisplay();
 }
 
-int main(int argc, char** argv) {
-	glutInit(&argc, argv);
-	glutInitWindowPosition(100, 100);
-	glutInitWindowSize(w, h);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-	glutCreateWindow("Task 1");
 
+int main(int argc, char** argv)
+{
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE);
+	glutInitWindowSize(600, 600);
+	glutCreateWindow("Simple shaders");
 	GLenum glew_status = glewInit();
 	if (GLEW_OK != glew_status)
 	{
@@ -290,17 +303,13 @@ int main(int argc, char** argv) {
 		std::cout << "No support for OpenGL 2.0 found\n";
 		return 1;
 	}
-
-
-	Init();
-	InitShader();
+	initGL();
+	initShader();
 	initVAO();
-
-	glutReshapeFunc(Reshape);
-	glutDisplayFunc(Render);
-	glutKeyboardFunc(Keyboard);
-
+	glutReshapeFunc(resizeWindow);
+	glutDisplayFunc(render);
+	glutKeyboardFunc(keyboard);
 	glutMainLoop();
+	freeShader();
+	freeVAO();
 }
-
-
