@@ -29,6 +29,13 @@ int w = 0, h = 0;
 #define NORMAL_VB		2
 #define TEXCOORD_VB		3
 
+float translateX = 0;
+float translateY = 0;
+float translateZ = 0;
+float angleX = 0;
+float angleY = 0;
+float angleZ = 0;
+
 void checkOpenGLerror()
 {
 	GLenum errCode;
@@ -47,6 +54,7 @@ public:
 	GLint a_material_specular;
 	GLint a_material_emission;
 	GLint a_material_shininess;
+	GLint a_transform_model;
 
 	GLuint texture;
 	size_t indices_size;
@@ -57,9 +65,13 @@ public:
 	glm::vec4 material_ambient, material_diffuse, material_specular, material_emission;
 	GLfloat material_shininess;
 
-	Object(string object_path, string texture_path, GLuint Program) {
-		
+	glm::mat4 transform_model;
+
+	
+	Object(string object_path, string texture_path, GLuint Program, glm::mat4 transform) {
+		transform_model = transform;
 		init_attributes(Program);
+		
 		// Read our .obj file
 		std::vector<glm::vec3> vertices;
 		std::vector<glm::vec2> texcoords;
@@ -73,7 +85,7 @@ public:
 		std::vector<glm::vec3> indexed_normals;
 		indexVBO(vertices, texcoords, normals, indices, indexed_vertices, indexed_texcoords, indexed_normals);
 		printf("indexed_vertices: %d\nindexed_texcoords: %d\nindexed_normals: %d\nindices: %d\n", indexed_vertices.size(), indexed_texcoords.size(), indexed_normals.size(), indices.size());
-
+		
 		glGenVertexArrays(1, &VAO);
 		glBindVertexArray(VAO);
 		glGenBuffers(4, m_Buffers);
@@ -115,12 +127,87 @@ public:
 		//////// Init Material /////////
 		material_emission = { 0,0,0,1 };
 		material_ambient = { 0.25, 0.25, 0.25, 0 };
+		material_diffuse = { 0.2, 0.5, 0.2, 0 };
+		material_specular = { 0.027, 0.027, 0.027, 0 };
+		material_shininess = 10;
+	}
+	
+	/*
+	Object(string object_path, string texture_path, GLuint Program, glm::mat4 transform) {
+		transform_model = transform;
+		init_attributes(Program);
+		
+		// Read our .obj file
+		objl::Loader loader;
+		loader.LoadFile(object_path);
+		unsigned int NumVertices = loader.LoadedMeshes[0].Vertices.size();
+		unsigned int NumIndices = loader.LoadedMeshes[0].Indices.size();
+		std::vector<unsigned int> indices;
+		std::vector<objl::Vector3> indexed_vertices;
+		std::vector<objl::Vector2> indexed_texcoords;
+		std::vector<objl::Vector3> indexed_normals;
+
+		for (unsigned int i = 0; i < NumVertices; i++) {
+			indexed_vertices.push_back(loader.LoadedMeshes[0].Vertices[i].Position);
+			indexed_normals.push_back(loader.LoadedMeshes[0].Vertices[i].Normal);
+			indexed_texcoords.push_back(loader.LoadedMeshes[0].Vertices[i].TextureCoordinate);
+		}
+
+		for (unsigned int i = 0; i < NumIndices; i++) {
+			indices.push_back(loader.LoadedMeshes[0].Indices[i]);
+		}
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+		glGenBuffers(4, m_Buffers);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(indexed_vertices[0]) * indexed_vertices.size(), &indexed_vertices[0], GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(a_coord);
+		glVertexAttribPointer(a_coord, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[TEXCOORD_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(indexed_texcoords[0]) * indexed_texcoords.size(), &indexed_texcoords[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(a_texcoord);
+		glVertexAttribPointer(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(indexed_normals[0]) * indexed_normals.size(), &indexed_normals[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(a_norm);
+		glVertexAttribPointer(a_norm, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(indices[0]), &indices[0], GL_STATIC_DRAW);
+		indices_size = indices.size();
+
+		glBindVertexArray(0);
+
+		checkOpenGLerror();
+
+		///////// Load Textures //////////
+		int width, height;
+		unsigned char* image = SOIL_load_image(texture_path.data(), &width, &height, 0, SOIL_LOAD_RGB);
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		SOIL_free_image_data(image);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		//////// Init Material /////////
+		material_emission = { 0,0,0,1 };
+		material_ambient = { 0.25, 0.25, 0.25, 0 };
 		material_diffuse = { 0.3, 0.2, 0.25, 0 };
 		material_specular = { 0.027, 0.027, 0.027, 0 };
 		material_shininess = 10;
 	}
+	*/
 
 	void init_attributes(GLuint Program) {
+		//transform_model = glm::rotate(rotateY, glm::vec3(0, 0, 1));
+		//transform_model = glm::rotate(transform_model, rotateX, glm::vec3(1, 0, 0));
+
 		const char* attr_name = "coord";
 		a_coord = glGetAttribLocation(Program, attr_name);
 
@@ -148,6 +235,8 @@ public:
 		unif_name = "material_shininess";
 		a_material_shininess = glGetUniformLocation(Program, unif_name);
 
+		unif_name = "transform_model";
+		a_transform_model = glGetUniformLocation(Program, unif_name);
 	}
 };
 
@@ -156,7 +245,6 @@ GLuint Phong;
 GLuint Gouraud;
 bool select = false;
 
-GLint a_transform_model;
 GLint a_transform_viewProjection;
 GLint a_transform_normal;
 GLint a_transform_viewPosition;
@@ -174,11 +262,10 @@ glm::vec3 eye;
 glm::vec4 light_position, light_ambient, light_diffuse, light_specular;
 glm::vec3 light_attenuation;
 
-float lightZ = 0;
+float lightZ = 20;
+float lightY = 20;
 float lightX = 2;
 float lightAngle = 0;
-float rotateX = 0;
-float rotateY = 0;
 float scaleX = 1;
 float scaleY = 1;
 glm::mat4 Matrix_projection;
@@ -251,10 +338,7 @@ GLuint initShader(string vss, string fss)
 }
 
 void init_attributes() {
-	const char* unif_name = "transform_model";
-	a_transform_model = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "transform_viewProjection";
+	const char* unif_name = "transform_viewProjection";
 	a_transform_viewProjection = glGetUniformLocation(Program, unif_name);
 
 	unif_name = "transform_normal";
@@ -324,8 +408,15 @@ void set_light() {
 }
 
 void load_objects() {
-	objects.push_back(Object("african_head.obj", "african_head_diffuse.jpg", Program));
-	objects.push_back(Object("african_head.obj", "african_head_diffuse.jpg", Program));
+	objects.push_back(Object("objects/T_34.obj", "objects/T_34.jpg", Program, glm::mat4()));
+	objects.push_back(Object("objects/IS7.obj", "objects/IS7.jpg", Program, glm::translate(glm::mat4(), glm::vec3(-10.0f, 0.0f, 3.0f))));
+	objects.push_back(Object("objects/T_34.obj", "objects/T_34.jpg", Program, glm::translate(glm::mat4(), glm::vec3(-15.0f, 0.0f, 0.0f))));
+
+	objects.push_back(Object("objects/Tiger.obj", "objects/Tiger.jpg", Program, glm::rotate(glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 40.0f)), glm::radians(180.0f), glm::vec3(0, 1, 0)))) ;
+	objects.push_back(Object("objects/Tiger2.obj", "objects/Tiger2.jpg", Program, glm::rotate(glm::translate(glm::mat4(), glm::vec3(-10.0f, 0.0f, 40.0f)), glm::radians(180.0f), glm::vec3(0, 1, 0))));
+
+	objects.push_back(Object("objects/floor.obj", "objects/f.jpg", Program, glm::mat4()));
+	objects[objects.size() - 1].material_diffuse = { 0.1, 0.2, 0.1, 0 };
 }
 
 void render()
@@ -333,21 +424,17 @@ void render()
 	glMatrixMode(GL_MODELVIEW);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(Program);
-	glm::vec4  lp = { lightX,0,0,1 };
+	glm::vec4  lp = { lightX,lightY,0,1 };
 	glm::mat4  m = glm::translate(glm::vec3(0, 0, lightZ));
 	m = glm::rotate(m, lightAngle, glm::vec3(0, 0, 1));
 	lp = m * lp;
 
-	// vert shader part, never changes
-	glm::mat4 transform_model = glm::rotate(rotateY, glm::vec3(0, 0, 1));
-	transform_model = glm::rotate(transform_model, rotateX, glm::vec3(1, 0, 0));
-
-	glUniformMatrix4fv(a_transform_model, 1, false, glm::value_ptr(transform_model));
+	Matrix_projection = glm::translate(Matrix_projection, glm::vec3(translateX, translateY, translateZ));
+	Matrix_projection = glm::rotate(Matrix_projection, glm::radians(angleX), glm::vec3(1, 0, 0));
+	Matrix_projection = glm::rotate(Matrix_projection, glm::radians(angleY), glm::vec3(0, 1, 0));
+	Matrix_projection = glm::rotate(Matrix_projection, glm::radians(angleZ), glm::vec3(0, 0, 1));
 	glUniformMatrix4fv(a_transform_viewProjection, 1, false, glm::value_ptr(Matrix_projection));
 	glUniform3fv(a_transform_viewPosition, 1, glm::value_ptr(eye));
-
-	glm::mat3 transform_normal = glm::inverseTranspose(glm::mat3(transform_model));
-	glUniformMatrix3fv(a_transform_normal, 1, false, glm::value_ptr(transform_normal));
 
 	glUniform4fv(a_light_position, 1, glm::value_ptr(lp));
 	glUniform4fv(a_light_ambient, 1, glm::value_ptr(light_ambient));
@@ -360,13 +447,16 @@ void render()
 
 	for (auto x : objects) {
 		x.init_attributes(Program);
+		glUniformMatrix4fv(x.a_transform_model, 1, false, glm::value_ptr(x.transform_model));
+		glm::mat3 transform_normal = glm::inverseTranspose(glm::mat3(x.transform_model));
+		glUniformMatrix3fv(a_transform_normal, 1, false, glm::value_ptr(transform_normal));
 		glUniform4fv(x.a_material_ambient, 1, glm::value_ptr(x.material_ambient));
 		glUniform4fv(x.a_material_diffuse, 1, glm::value_ptr(x.material_diffuse));
 		glUniform4fv(x.a_material_specular, 1, glm::value_ptr(x.material_specular));
 		glUniform4fv(x.a_material_emission, 1, glm::value_ptr(x.material_emission));
 		glUniform1f(x.a_material_shininess, x.material_shininess);
 		glUniform1i(x.a_material_texture, 0);
-		glBindVertexArray(x.VAO); // T_34_85
+		glBindVertexArray(x.VAO); 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, x.texture);
 		glDrawElements(GL_TRIANGLES,
@@ -384,19 +474,38 @@ void render()
 
 void keyboard(unsigned char key, int x, int y)
 {
+	angleX = angleY = angleZ = translateX = translateY = translateZ = 0;
 	switch (key)
 	{
 	case 'w':
-		rotateX += 0.1;
+		translateX = 0.1;
 		break;
 	case 's':
-		rotateX -= 0.1;
+		translateX = -0.1;
 		break;
 	case 'a':
-		rotateY -= 0.1;
+		translateY = 0.1;
 		break;
 	case 'd':
-		rotateY += 0.1;
+		translateY = -0.1;
+		break;
+	case 'q':
+		translateZ = 0.5;
+		break;
+	case 'e':
+		translateZ = -0.5;
+		break;
+	case 't':
+		lightZ += 1;
+		break;
+	case 'g':
+		lightZ -= 2;
+		break;
+	case 'f':
+		lightAngle -= 0.1;
+		break;
+	case 'h':
+		lightAngle += 0.1;
 		break;
 	default:
 		break;
@@ -407,20 +516,9 @@ void keyboard(unsigned char key, int x, int y)
 
 
 void specialKeys(int key, int x, int y) {
+	angleX = angleY = angleZ = translateX = translateY = translateZ = 0;
 	switch (key)
 	{
-	case GLUT_KEY_UP:
-		lightZ += 0.1;
-		break;
-	case GLUT_KEY_DOWN:
-		lightZ -= 0.1;
-		break;
-	case GLUT_KEY_LEFT:
-		lightAngle -= 0.1;
-		break;
-	case GLUT_KEY_RIGHT:
-		lightAngle += 0.1;
-		break;
 	case GLUT_KEY_F1:
 		use_texture = !use_texture;
 		break;
@@ -436,6 +534,24 @@ void specialKeys(int key, int x, int y) {
 		}
 		init_attributes();
 		//initVAO();
+		break;
+	case GLUT_KEY_UP: 
+		angleX = 4;
+		break;
+	case GLUT_KEY_DOWN: 
+		angleX = -4;
+		break;
+	case GLUT_KEY_RIGHT: 
+		angleY = 4;
+		break;
+	case GLUT_KEY_LEFT: 
+		angleY = -4;
+		break;
+	case GLUT_KEY_PAGE_UP: 
+		angleZ = 4;
+		break;
+	case GLUT_KEY_PAGE_DOWN: 
+		angleZ = -4;
 		break;
 	default:
 		break;
