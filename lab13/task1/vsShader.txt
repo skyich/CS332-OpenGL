@@ -1,0 +1,14 @@
+#version 330 core
+attribute vec4 coord;
+attribute vec4 clr;
+// параметры преобразований
+uniform mat4 transform_model;
+uniform mat4 transform_viewProjection;
+uniform mat3 transform_normal;
+uniform vec3 transform_viewPosition;
+out vec4 Clr;
+void main() {
+vec4 vertex = transform_model * coord;
+gl_Position = transform_viewProjection * vertex;
+Clr = clr;
+}

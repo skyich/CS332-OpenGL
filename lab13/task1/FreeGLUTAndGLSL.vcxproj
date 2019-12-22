@@ -19,10 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="objloader.cpp" />
     <ClCompile Include="task1.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="OBJ_Loader.h" />
+    <ClInclude Include="objloader.h" />
     <ClInclude Include="SOIL.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
