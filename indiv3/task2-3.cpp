@@ -10,6 +10,7 @@
 #include "glm/glm.hpp"
 #include "SOIL.h"
 #include "objloader.h"
+#include "OBJ_Loader.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/mat4x4.hpp>
@@ -28,18 +29,133 @@ int w = 0, h = 0;
 #define NORMAL_VB		2
 #define TEXCOORD_VB		3
 
-GLuint m_VAO;
-GLuint m_Buffers[4];
+void checkOpenGLerror()
+{
+	GLenum errCode;
+	if ((errCode = glGetError()) != GL_NO_ERROR)
+		std::cout << "OpenGl error! - " << gluErrorString(errCode);
+}
 
+class Object {
+public:
+	GLint a_coord;
+	GLint a_norm;
+	GLint a_texcoord;
+	GLint a_material_texture;
+	GLint a_material_ambient;
+	GLint a_material_diffuse;
+	GLint a_material_specular;
+	GLint a_material_emission;
+	GLint a_material_shininess;
+
+	GLuint texture;
+	size_t indices_size;
+
+	GLuint VAO;
+	GLuint m_Buffers[4];
+
+	glm::vec4 material_ambient, material_diffuse, material_specular, material_emission;
+	GLfloat material_shininess;
+
+	Object(string object_path, string texture_path, GLuint Program) {
+		
+		init_attributes(Program);
+		// Read our .obj file
+		std::vector<glm::vec3> vertices;
+		std::vector<glm::vec2> texcoords;
+		std::vector<glm::vec3> normals;
+		bool res = loadOBJ(object_path.data(), vertices, texcoords, normals);
+		printf("vertices: %d\ntexcoords: %d\nnormals: %d\n", vertices.size(), texcoords.size(), normals.size());
+
+		std::vector<unsigned short> indices;
+		std::vector<glm::vec3> indexed_vertices;
+		std::vector<glm::vec2> indexed_texcoords;
+		std::vector<glm::vec3> indexed_normals;
+		indexVBO(vertices, texcoords, normals, indices, indexed_vertices, indexed_texcoords, indexed_normals);
+		printf("indexed_vertices: %d\nindexed_texcoords: %d\nindexed_normals: %d\nindices: %d\n", indexed_vertices.size(), indexed_texcoords.size(), indexed_normals.size(), indices.size());
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+		glGenBuffers(4, m_Buffers);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_vertices.size(), &indexed_vertices[0], GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(a_coord);
+		glVertexAttribPointer(a_coord, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[TEXCOORD_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * indexed_texcoords.size(), &indexed_texcoords[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(a_texcoord);
+		glVertexAttribPointer(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_normals.size(), &indexed_normals[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(a_norm);
+		glVertexAttribPointer(a_norm, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
+		indices_size = indices.size();
+
+		glBindVertexArray(0);
+
+		checkOpenGLerror();
+
+		///////// Load Textures //////////
+		int width, height;
+		unsigned char* image = SOIL_load_image(texture_path.data(), &width, &height, 0, SOIL_LOAD_RGB);
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		SOIL_free_image_data(image);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		//////// Init Material /////////
+		material_emission = { 0,0,0,1 };
+		material_ambient = { 0.25, 0.25, 0.25, 0 };
+		material_diffuse = { 0.3, 0.2, 0.25, 0 };
+		material_specular = { 0.027, 0.027, 0.027, 0 };
+		material_shininess = 10;
+	}
+
+	void init_attributes(GLuint Program) {
+		const char* attr_name = "coord";
+		a_coord = glGetAttribLocation(Program, attr_name);
+
+		attr_name = "norm";
+		a_norm = glGetAttribLocation(Program, attr_name);
+
+		attr_name = "texcoord";
+		a_texcoord = glGetAttribLocation(Program, attr_name);
+
+		const char* unif_name = "material_texture";
+		a_material_texture = glGetUniformLocation(Program, unif_name);
+
+		unif_name = "material_ambient";
+		a_material_ambient = glGetUniformLocation(Program, unif_name);
+
+		unif_name = "material_diffuse";
+		a_material_diffuse = glGetUniformLocation(Program, unif_name);
+
+		unif_name = "material_specular";
+		a_material_specular = glGetUniformLocation(Program, unif_name);
+
+		unif_name = "material_emission";
+		a_material_emission = glGetUniformLocation(Program, unif_name);
+
+		unif_name = "material_shininess";
+		a_material_shininess = glGetUniformLocation(Program, unif_name);
+
+	}
+};
 
 GLuint Program;
 GLuint Phong;
 GLuint Gouraud;
 bool select = false;
 
-GLint a_coord;
-GLint a_norm;
-GLint a_texcoord;
 GLint a_transform_model;
 GLint a_transform_viewProjection;
 GLint a_transform_normal;
@@ -49,26 +165,14 @@ GLint a_light_ambient;
 GLint a_light_diffuse;
 GLint a_light_specular;
 GLint a_light_attenuation;
-GLint a_material_texture;
-GLint a_material_ambient;
-GLint a_material_diffuse;
-GLint a_material_specular;
-GLint a_material_emission;
-GLint a_material_shininess;
+
 GLint a_use_texture;
-
-
-GLuint texture;
-size_t indices_size;
 
 bool use_texture = true;
 
 glm::vec3 eye;
 glm::vec4 light_position, light_ambient, light_diffuse, light_specular;
 glm::vec3 light_attenuation;
-
-glm::vec4 material_ambient, material_diffuse, material_specular, material_emission;
-GLfloat material_shininess;
 
 float lightZ = 0;
 float lightX = 2;
@@ -78,6 +182,8 @@ float rotateY = 0;
 float scaleX = 1;
 float scaleY = 1;
 glm::mat4 Matrix_projection;
+
+vector<Object> objects;
 
 void shaderLog(unsigned int shader)
 {
@@ -90,36 +196,12 @@ void shaderLog(unsigned int shader)
 	}
 }
 
-void set_light() {
-
-	light_position = { 0,0,0,0 };
-	light_ambient = { 1,1,1,1 };
-	light_diffuse = { 1,1,1,1 };
-	light_specular = { 1,1,1,1 };
-	light_attenuation = { 0,0,0 };
-}
-
-void set_material() {
-
-	material_emission = { 0,0,0,1 };
-	material_ambient = { 0.25, 0.25, 0.25, 0 };
-	material_diffuse = { 0.3, 0.2, 0.25, 0 };
-	material_specular = { 0.027, 0.027, 0.027, 0 };
-	material_shininess = 10;
-}
-
 void initGL()
 {
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(1, 1, 1, 1);
 }
 
-void checkOpenGLerror()
-{
-	GLenum errCode;
-	if ((errCode = glGetError()) != GL_NO_ERROR)
-		std::cout << "OpenGl error! - " << gluErrorString(errCode);
-}
 
 std::string readShader(std::string filename)
 {
@@ -169,15 +251,6 @@ GLuint initShader(string vss, string fss)
 }
 
 void init_attributes() {
-	const char* attr_name = "coord";
-	a_coord = glGetAttribLocation(Program, attr_name);
-
-	attr_name = "norm";
-	a_norm = glGetAttribLocation(Program, attr_name);
-
-	attr_name = "texcoord";
-	a_texcoord = glGetAttribLocation(Program, attr_name);
-
 	const char* unif_name = "transform_model";
 	a_transform_model = glGetUniformLocation(Program, unif_name);
 
@@ -205,72 +278,8 @@ void init_attributes() {
 	unif_name = "light_attenuation";
 	a_light_attenuation = glGetUniformLocation(Program, unif_name);
 
-	unif_name = "material_texture";
-	a_material_texture = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "material_ambient";
-	a_material_ambient = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "material_diffuse";
-	a_material_diffuse = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "material_specular";
-	a_material_specular = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "material_emission";
-	a_material_emission = glGetUniformLocation(Program, unif_name);
-
-	unif_name = "material_shininess";
-	a_material_shininess = glGetUniformLocation(Program, unif_name);
-
 	unif_name = "use_texture";
 	a_use_texture = glGetUniformLocation(Program, unif_name);
-}
-
-void initVAO()
-{
-	// Read our .obj file
-	std::vector<glm::vec3> vertices;
-	std::vector<glm::vec2> texcoords;
-	std::vector<glm::vec3> normals;
-	bool res = loadOBJ("african_head.obj", vertices, texcoords, normals);
-	printf("vertices: %d\ntexcoords: %d\nnormals: %d\n", vertices.size(), texcoords.size(), normals.size());
-
-	std::vector<unsigned short> indices;
-	std::vector<glm::vec3> indexed_vertices;
-	std::vector<glm::vec2> indexed_texcoords;
-	std::vector<glm::vec3> indexed_normals;
-	indexVBO(vertices, texcoords, normals, indices, indexed_vertices, indexed_texcoords, indexed_normals);
-	printf("indexed_vertices: %d\nindexed_texcoords: %d\nindexed_normals: %d\nindices: %d\n", indexed_vertices.size(), indexed_texcoords.size(), indexed_normals.size(), indices.size());
-	
-	glGenVertexArrays(1, &m_VAO);
-	glBindVertexArray(m_VAO);
-	glGenBuffers(4, m_Buffers);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_vertices.size(), &indexed_vertices[0], GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(a_coord);
-	glVertexAttribPointer(a_coord, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[TEXCOORD_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * indexed_texcoords.size(), &indexed_texcoords[0], GL_STATIC_DRAW);
-	glEnableVertexAttribArray(a_texcoord);
-	glVertexAttribPointer(a_texcoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * indexed_normals.size(), &indexed_normals[0], GL_STATIC_DRAW);
-	glEnableVertexAttribArray(a_norm);
-	glVertexAttribPointer(a_norm, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Buffers[INDEX_BUFFER]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
-	indices_size = indices.size();
-
-	glBindVertexArray(0);
-
-
-	checkOpenGLerror();
 }
 
 void freeShader()
@@ -281,26 +290,12 @@ void freeShader()
 
 void freeVAO()
 {
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers(4, m_Buffers);
-	glDeleteVertexArrays(1, &m_VAO);
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//glDeleteBuffers(4, m_Buffers);
+	//for (auto x : VAOS)
+		//glDeleteVertexArrays(1, &x);
 }
 
-void initTexture()
-{
-
-	int width, height;
-	unsigned char* image = SOIL_load_image("african_head_diffuse.jpg", &width, &height, 0, SOIL_LOAD_RGB);
-	//tex1 = SOIL_load_OGL_texture("cat_diff.tga", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_MULTIPLY_ALPHA | SOIL_FLAG_INVERT_Y);
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	SOIL_free_image_data(image);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-
-}
 
 void resizeWindow(int x, int y)
 {
@@ -316,6 +311,21 @@ void resizeWindow(int x, int y)
 	glm::vec3 up = { 0,0,-1 };
 
 	Matrix_projection *= glm::lookAt(eye, center, up);
+}
+
+
+void set_light() {
+
+	light_position = { 0,0,0,0 };
+	light_ambient = { 1,1,1,1 };
+	light_diffuse = { 1,1,1,1 };
+	light_specular = { 1,1,1,1 };
+	light_attenuation = { 0,0,0 };
+}
+
+void load_objects() {
+	objects.push_back(Object("african_head.obj", "african_head_diffuse.jpg", Program));
+	objects.push_back(Object("african_head.obj", "african_head_diffuse.jpg", Program));
 }
 
 void render()
@@ -345,26 +355,26 @@ void render()
 	glUniform4fv(a_light_specular, 1, glm::value_ptr(light_specular));
 
 	glUniform3fv(a_light_attenuation, 1, glm::value_ptr(light_attenuation));
-
-	glUniform4fv(a_material_ambient, 1, glm::value_ptr(material_ambient));
-	glUniform4fv(a_material_diffuse, 1, glm::value_ptr(material_diffuse));
-	glUniform4fv(a_material_specular, 1, glm::value_ptr(material_specular));
-	glUniform4fv(a_material_emission, 1, glm::value_ptr(material_emission));
-	glUniform1f(a_material_shininess, material_shininess);
-
 	glUniform1i(a_use_texture, use_texture);
-	glUniform1i(a_material_texture, 0);
-	
-	glBindVertexArray(m_VAO);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
 
-	glDrawElements(GL_TRIANGLES,
-		indices_size,
-		GL_UNSIGNED_SHORT,
-		(void*)0);
 
-	glBindVertexArray(0);
+	for (auto x : objects) {
+		x.init_attributes(Program);
+		glUniform4fv(x.a_material_ambient, 1, glm::value_ptr(x.material_ambient));
+		glUniform4fv(x.a_material_diffuse, 1, glm::value_ptr(x.material_diffuse));
+		glUniform4fv(x.a_material_specular, 1, glm::value_ptr(x.material_specular));
+		glUniform4fv(x.a_material_emission, 1, glm::value_ptr(x.material_emission));
+		glUniform1f(x.a_material_shininess, x.material_shininess);
+		glUniform1i(x.a_material_texture, 0);
+		glBindVertexArray(x.VAO); // T_34_85
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, x.texture);
+		glDrawElements(GL_TRIANGLES,
+			x.indices_size,
+			GL_UNSIGNED_SHORT,
+			(void*)0);
+		glBindVertexArray(0);
+	}
 
 	glUseProgram(0);
 	checkOpenGLerror();
@@ -425,7 +435,7 @@ void specialKeys(int key, int x, int y) {
 			cout << "Gouraud shader\n";
 		}
 		init_attributes();
-		initVAO();
+		//initVAO();
 		break;
 	default:
 		break;
@@ -455,10 +465,9 @@ int main(int argc, char** argv)
 	Gouraud = initShader("vsShader.txt", "fsShader.txt");
 	Program = Phong;
 	init_attributes();
-	initTexture();
-	initVAO();
+	load_objects();
 	set_light();
-	set_material();
+
 	glutReshapeFunc(resizeWindow);
 	glutDisplayFunc(render);
 	glutKeyboardFunc(keyboard);

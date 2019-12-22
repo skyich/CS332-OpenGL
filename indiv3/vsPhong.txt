@@ -1,0 +1,32 @@
+#version 330
+attribute vec4 coord;
+attribute vec3 norm;
+attribute vec2 texcoord;
+
+// ��������� ��������������
+uniform mat4 transform_model;
+uniform mat4 transform_viewProjection;
+uniform mat3 transform_normal;
+uniform vec3 transform_viewPosition;
+
+// ��������� ��������� ��������� ���������
+uniform vec4 light_position;
+
+// ��������� ��� ������������ �������
+out vec2 vert_texcoord;
+out vec3 vert_normal;
+out vec3 vert_lightDir;
+out vec3 vert_viewDir;
+out float vert_distance;
+
+void main(){
+	vec4 vertex = transform_model * coord;
+	vec4 lightDir = light_position - vertex;
+	gl_Position = transform_viewProjection * vertex;
+	
+	vert_texcoord = texcoord;
+	vert_normal = transform_normal * norm;
+	vert_lightDir = vec3(lightDir);
+	vert_viewDir = transform_viewPosition - vec3(vertex);
+	vert_distance = length(lightDir);
+}

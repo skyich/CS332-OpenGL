@@ -149,7 +149,9 @@ void initShader()
 	checkOpenGLerror();
 }
 
-
+double DRand(double a, double b) {
+	return a + std::fmod(static_cast<double>(std::rand()), b - a);
+}
 
 void initVAO()
 {
@@ -177,16 +179,12 @@ void initVAO()
 	glEnableVertexAttribArray(a_coord);
 	glVertexAttribPointer(a_coord, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-	float* COLORS = new float[4 * indexed_vertices.size()];
-	for (int i = 0; i < indexed_vertices.size(); ++i) {
-		int r = std::rand() % 8;
-		for (int j = 0; j < 4; ++j) {
-			COLORS[i * 4 + j] = colors[r][j];
-		}
-	}
+	std::vector<glm::vec4> colors;
+	for (int i = 0; i < indexed_vertices.size(); ++i)
+		colors.push_back(glm::vec4(static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), static_cast <float> (rand()) / static_cast <float> (RAND_MAX), 0.3));
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[NORMAL_VB]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * indexed_vertices.size(), COLORS, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * indexed_vertices.size(), &colors[0], GL_STATIC_DRAW);
 	glEnableVertexAttribArray(a_clr);
 	glVertexAttribPointer(a_clr, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
